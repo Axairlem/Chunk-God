@@ -1,0 +1,12 @@
+{
+	"required": true,
+	"package": "net.axairlem.cg.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"mixins": [
+		"GoldenShovelItemMixin",
+      	"SplashPotionItemMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

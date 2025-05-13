@@ -1,0 +1,40 @@
+{
+	"schemaVersion": 1,
+	"id": "chunk-god",
+	"version": "${version}",
+	"name": "Chunk God",
+	"description": "CG allows you to transport chunk inside your inventory!",
+	"authors": [
+		"Axairlem"
+	],
+	"contact": {
+		"homepage": "https://fabricmc.net/",
+		"sources": "https://github.com/FabricMC/fabric-example-mod"
+	},
+	"license": "MIT",
+	"icon": "assets/chunk-god/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"net.axairlem.cg.ChunkNABox"
+		],
+		"client": [
+			"net.axairlem.cg.ChunkNABoxClient"
+		],
+		"fabric-datagen": [
+			"net.axairlem.cg.ChunkNABoxDataGenerator"
+		]
+	},
+	"mixins": [
+      "chunk-god.json"
+	],
+	"depends": {
+		"fabricloader": ">=0.16.14",
+		"minecraft": "~1.21.1",
+		"java": ">=21",
+		"fabric-api": "*"
+	},
+	"suggests": {
+		"another-mod": "*"
+	}
+}
