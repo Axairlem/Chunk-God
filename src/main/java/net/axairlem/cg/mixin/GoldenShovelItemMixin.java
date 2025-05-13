@@ -9,6 +9,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.registry.Registries;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 import net.minecraft.util.*;
 import net.minecraft.util.math.BlockPos;
@@ -73,8 +74,9 @@ public class GoldenShovelItemMixin {
                 addedStack.set(DataComponentTypes.ENCHANTMENT_GLINT_OVERRIDE, true);
                 user.giveItemStack(addedStack);
 
-
-                ChunkStorage.savedChunks.put(chunkID, blocks);
+                ChunkStorage state = ChunkStorage.get((ServerWorld) world);
+                state.savedChunks.put(chunkID, blocks);
+                state.markDirty();
 
                 user.sendMessage(Text.literal("Captured Ri de pisse #[" + chunkX + ", " + chunkZ + "]"), false);
             }

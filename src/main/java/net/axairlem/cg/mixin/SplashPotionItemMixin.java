@@ -7,7 +7,9 @@ import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.projectile.thrown.PotionEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
+import net.minecraft.nbt.NbtCompound;
 import net.minecraft.registry.Registries;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.hit.HitResult;
@@ -19,6 +21,8 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+
+import java.util.Vector;
 
 @Mixin(PotionEntity.class)
 public class SplashPotionItemMixin {
@@ -45,16 +49,20 @@ public class SplashPotionItemMixin {
                 String itemID = itemNameText.toString();
                 itemID = itemID.substring(itemID.indexOf('[') + 1, itemID.indexOf(']'));
                 self.sendMessage(Text.of(itemID));
+
+                ChunkStorage state = ChunkStorage.get((ServerWorld) world);
+                Vector<NbtCompound> blocks = state.savedChunks.get(itemID);
                 if(ChunkStorage.savedChunks.containsKey(itemID) ) {
 
                     // PASTING CHUNKS
-                    //self.sendMessage(Text.literal("Replacing ri?..."));
-                    for(var entry : ChunkStorage.savedChunks.get(itemID) ) {
+                    for(NbtCompound entry : blocks) {
                         BlockPos pos = new BlockPos(entry.getInt("chunkPosX") + (chunkX << 4), entry.getInt("chunkPosY"), entry.getInt("chunkPosZ") + (chunkZ << 4));
                         Identifier id = Identifier.of(entry.getString("state"));
 
                         world.setBlockState(pos, Registries.BLOCK.get(id).getDefaultState(), 2);
                     }
+                    state.savedChunks.remove(itemID);
+                    state.markDirty();
                     Entity owner = self.getOwner();
                     if(owner instanceof PlayerEntity player){
                         player.sendMessage(Text.literal("Ri has been replaced!?..."));
