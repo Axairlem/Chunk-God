@@ -4,28 +4,17 @@ import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtList;
 import net.minecraft.registry.RegistryWrapper;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.world.PersistentState;
-import net.minecraft.world.PersistentStateManager;
+import net.minecraft.world.World;
 
 import java.util.HashMap;
 import java.util.Vector;
-import java.util.function.BiFunction;
-import java.util.function.Supplier;
 
 public class ChunkStorage extends PersistentState {
-    public static final HashMap<String, Vector<NbtCompound>> savedChunks = new HashMap<>();
 
-    public static final PersistentState.Type<ChunkStorage> TYPE = new PersistentState.Type<>(
-            (Supplier<ChunkStorage>)ChunkStorage::new,
-            (BiFunction<NbtCompound, RegistryWrapper.WrapperLookup, ChunkStorage>)ChunkStorage::load,
-            null
-    );
-
-    public static ChunkStorage get(ServerWorld world) {
-        PersistentStateManager manager = world.getPersistentStateManager();
-        return manager.getOrCreate(TYPE, "chunkgod_chunks");
-    }
+    public HashMap<String, Vector<NbtCompound>> savedChunks = new HashMap<>();
 
     @Override
     public NbtCompound writeNbt(NbtCompound nbt, RegistryWrapper.WrapperLookup registryLookup) {
@@ -36,7 +25,7 @@ public class ChunkStorage extends PersistentState {
             chunkData.putString("chunkID", entry.getKey());
 
             NbtList blockList = new NbtList();
-            blockList.addAll(entry.getValue());
+            blockList.addAll(entry.getValue()); // adds the full list
 
             chunkData.put("blocks", blockList);
             chunkList.add(chunkData);
@@ -45,23 +34,43 @@ public class ChunkStorage extends PersistentState {
         nbt.put("savedChunks", chunkList);
         return nbt;
     }
-
-    public static ChunkStorage load(NbtCompound nbt, RegistryWrapper.WrapperLookup registryLookup) {
+    public static ChunkStorage createFromNbt(NbtCompound tag, RegistryWrapper.WrapperLookup registryLookup) {
         ChunkStorage storage = new ChunkStorage();
 
-        NbtList chunkList = nbt.getList("savedChunks", NbtElement.COMPOUND_TYPE);
-        for(NbtElement element : chunkList) {
-            NbtCompound chunkData = (NbtCompound)element;
-            String chunkID = chunkData.getString("chunkID");
+        NbtList chunkList = tag.getList("savedChunks", NbtElement.COMPOUND_TYPE);
+        for(NbtElement entry : chunkList) {
+            String chunkID = ((NbtCompound)entry).getString("chunkID");
+            NbtList blockList = ((NbtCompound)entry).getList("blocks", NbtElement.COMPOUND_TYPE);
 
-            NbtList blockList = chunkData.getList("blocks", NbtElement.COMPOUND_TYPE);
             Vector<NbtCompound> blocks = new Vector<>();
-            for(NbtElement block : blockList) {
-                blocks.add((NbtCompound)block);
+            for(var b : blockList) {
+                blocks.add((NbtCompound)b);
             }
 
             storage.savedChunks.put(chunkID, blocks);
         }
+
+        return storage;
+    }
+    public static ChunkStorage createNew(){
+        ChunkStorage storage = new ChunkStorage();
+        storage.savedChunks = new HashMap<>();
+        return storage;
+    }
+
+
+    private static final Type<ChunkStorage> type = new Type<>(
+            ChunkStorage::createNew,
+            ChunkStorage::createFromNbt,
+            null
+    );
+    public static ChunkStorage getServerState(MinecraftServer server) {
+        ServerWorld serverWorld = server.getWorld(World.OVERWORLD);
+        assert serverWorld != null;
+
+        ChunkStorage storage = serverWorld.getPersistentStateManager().getOrCreate(type, ChunkNABox.MOD_ID);
+
+        storage.markDirty();
 
         return storage;
     }

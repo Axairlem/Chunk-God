@@ -9,7 +9,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.registry.Registries;
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.hit.HitResult;
@@ -50,9 +50,11 @@ public class SplashPotionItemMixin {
                 itemID = itemID.substring(itemID.indexOf('[') + 1, itemID.indexOf(']'));
                 self.sendMessage(Text.of(itemID));
 
-                ChunkStorage state = ChunkStorage.get((ServerWorld) world);
-                Vector<NbtCompound> blocks = state.savedChunks.get(itemID);
-                if(ChunkStorage.savedChunks.containsKey(itemID) ) {
+                MinecraftServer server = world.getServer();
+                assert server != null;
+                ChunkStorage serverStorage = ChunkStorage.getServerState(server);
+                Vector<NbtCompound> blocks = serverStorage.savedChunks.get(itemID);
+                if(serverStorage.savedChunks.containsKey(itemID) ) {
 
                     // PASTING CHUNKS
                     for(NbtCompound entry : blocks) {
@@ -61,8 +63,7 @@ public class SplashPotionItemMixin {
 
                         world.setBlockState(pos, Registries.BLOCK.get(id).getDefaultState(), 2);
                     }
-                    state.savedChunks.remove(itemID);
-                    state.markDirty();
+                    serverStorage.savedChunks.remove(itemID);
                     Entity owner = self.getOwner();
                     if(owner instanceof PlayerEntity player){
                         player.sendMessage(Text.literal("Ri has been replaced!?..."));
