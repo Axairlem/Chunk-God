@@ -80,7 +80,7 @@ public class GoldenShovelItemMixin {
                 ChunkStorage serverStorage = ChunkStorage.getServerState(server);
                 serverStorage.savedChunks.put(chunkID, blocks);
 
-                user.sendMessage(Text.literal("Captured Ri de pisse #[" + chunkX + ", " + chunkZ + "]"), false);
+                user.sendMessage(Text.literal("Ri c'est le chunk god #[" + chunkX + ", " + chunkZ + "] !!ATTENTION RI, SI TU LANCE LA POTION, ÇA VA PASTE LE CHUNK AU COMPLET!!"), false);
             }
         }
     }

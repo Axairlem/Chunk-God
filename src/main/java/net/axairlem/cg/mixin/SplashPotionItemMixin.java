@@ -66,7 +66,7 @@ public class SplashPotionItemMixin {
                     serverStorage.savedChunks.remove(itemID);
                     Entity owner = self.getOwner();
                     if(owner instanceof PlayerEntity player){
-                        player.sendMessage(Text.literal("Ri has been replaced!?..."));
+                        player.sendMessage(Text.literal("Ri! RIII! QU'EST-CE T'A FAIT!?"));
                     }
                 }
             }
