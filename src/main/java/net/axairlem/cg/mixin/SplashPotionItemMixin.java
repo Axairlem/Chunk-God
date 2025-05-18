@@ -14,9 +14,7 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.World;
-import net.minecraft.world.chunk.Chunk;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -38,12 +36,14 @@ public class SplashPotionItemMixin {
         ItemStack itemStack = self.getStack();
 
         if(itemStack.getItem() == Items.SPLASH_POTION) {
-            ChunkPos chunkPos = new ChunkPos(BlockPos.ofFloored(hit.getPos()));
-            Chunk chunk = world.getChunk(chunkPos.x, chunkPos.z);
-            int chunkX = chunkPos.x;
-            int chunkZ = chunkPos.z;
 
-            // CHECK FOR EXISTING CHUNK DATA
+            BlockPos hitPos = new BlockPos(
+                    (int)hit.getPos().x,
+                    (int)hit.getPos().y,
+                    (int)hit.getPos().z
+            );
+
+            // CHECK FOR EXISTING CHUNK DATA IN PERSISTENT STORAGE
             Text itemNameText = itemStack.get(DataComponentTypes.ITEM_NAME);
             if(itemNameText != null){
                 String itemID = itemNameText.toString();
@@ -56,17 +56,19 @@ public class SplashPotionItemMixin {
                 Vector<NbtCompound> blocks = serverStorage.savedChunks.get(itemID);
                 if(serverStorage.savedChunks.containsKey(itemID) ) {
 
-                    // PASTING CHUNKS
+                    // PASTE CHUNK
                     for(NbtCompound entry : blocks) {
-                        BlockPos pos = new BlockPos(entry.getInt("chunkPosX") + (chunkX << 4), entry.getInt("chunkPosY"), entry.getInt("chunkPosZ") + (chunkZ << 4));
+                        BlockPos pos = new BlockPos(
+                                hitPos.getX() + entry.getInt("posX"),
+                                entry.getInt("posY"),
+                                hitPos.getZ() + entry.getInt("posZ")
+                        );
                         Identifier id = Identifier.of(entry.getString("state"));
-
                         world.setBlockState(pos, Registries.BLOCK.get(id).getDefaultState(), 2);
                     }
-                    serverStorage.savedChunks.remove(itemID);
                     Entity owner = self.getOwner();
                     if(owner instanceof PlayerEntity player){
-                        player.sendMessage(Text.literal("Ri! RIII! QU'EST-CE T'A FAIT!?"));
+                        player.sendMessage(Text.literal("Ri! RIII! QU'EST-CE T'A FAIT ENCORE!?"));
                     }
                 }
             }
