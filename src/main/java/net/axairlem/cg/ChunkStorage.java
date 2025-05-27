@@ -6,15 +6,18 @@ import net.minecraft.nbt.NbtList;
 import net.minecraft.registry.RegistryWrapper;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.PersistentState;
 import net.minecraft.world.World;
+import org.joml.Vector2i;
 
 import java.util.HashMap;
 import java.util.Vector;
 
 public class ChunkStorage extends PersistentState {
 
-    public HashMap<String, Vector<NbtCompound>> savedChunks = new HashMap<>();
+    public static HashMap<String, Vector<NbtCompound>> savedChunks = new HashMap<String, Vector<NbtCompound>>();
+    public static HashMap<Vector2i, Vector<BlockPos>> chunksToRegen = new HashMap<Vector2i, Vector<BlockPos>>();
 
     @Override
     public NbtCompound writeNbt(NbtCompound nbt, RegistryWrapper.WrapperLookup registryLookup) {

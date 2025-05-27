@@ -4,7 +4,9 @@
 	"compatibilityLevel": "JAVA_21",
 	"mixins": [
 		"GoldenShovelItemMixin",
-      	"SplashPotionItemMixin"
+      	"SplashPotionItemMixin",
+		"ServerChunkLoadingManagerMixin",
+		"RegionBasedStorageMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

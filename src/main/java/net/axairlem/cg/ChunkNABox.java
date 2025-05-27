@@ -1,6 +1,7 @@
 package net.axairlem.cg;
 
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 
 public class ChunkNABox implements ModInitializer {
 
@@ -8,6 +9,8 @@ public class ChunkNABox implements ModInitializer {
 
 	@Override
 	public void onInitialize() {
-
+		ServerTickEvents.END_SERVER_TICK.register(server -> {
+			TaskQueue.tick();
+		});
 	}
 }

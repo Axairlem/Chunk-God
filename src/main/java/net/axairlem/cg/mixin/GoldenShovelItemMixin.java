@@ -15,6 +15,7 @@ import net.minecraft.text.Text;
 import net.minecraft.util.*;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
+import org.joml.Vector2i;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -43,10 +44,13 @@ public abstract class GoldenShovelItemMixin {
             firstTimeUse = false;
         } else {
             // CAPTURE CHUNK
+            ChunkStorage serverStorage = new ChunkStorage(); // to store old blocks pos
+
             int minX = Math.min(firstBlockPos.getX(), user.getBlockPos().getX());
             int maxX = Math.max(firstBlockPos.getX(), user.getBlockPos().getX());
             int minZ = Math.min(firstBlockPos.getZ(), user.getBlockPos().getZ());
             int maxZ = Math.max(firstBlockPos.getZ(), user.getBlockPos().getZ());
+
             int xDistance = maxX - minX;
             int zDistance = maxZ - minZ;
             Vector<NbtCompound> blocks = new Vector<NbtCompound>();
@@ -56,6 +60,8 @@ public abstract class GoldenShovelItemMixin {
                         BlockPos pos = new BlockPos(x, y, z);
                         BlockState state = world.getBlockState(pos);
                         if(!state.isAir()){
+                            serverStorage.chunksToRegen.computeIfAbsent(new Vector2i(x >> 4, z >> 4), k -> new Vector<BlockPos>()).add(new BlockPos(x, y, z)); // add absolute block pos
+
                             NbtCompound blockNbt = new NbtCompound();
                             blockNbt.putInt("posX", x - minX - (xDistance / 2)); // local relative pos
                             blockNbt.putInt("posZ", z - minZ - (zDistance / 2));
@@ -69,7 +75,7 @@ public abstract class GoldenShovelItemMixin {
             }
 
             if(user.getInventory().getEmptySlot() == -1){
-                user.sendMessage(Text.literal("Ri ton inventaire est plein criss! MAUDIT RI DE PISSE!"), false);
+                user.sendMessage(Text.literal("Please, free up your inventory first."), false);
             } else {
                 // ADD NEW SPLASH_POTION
                 ItemStack addedStack = new ItemStack(Items.SPLASH_POTION);
@@ -81,10 +87,9 @@ public abstract class GoldenShovelItemMixin {
                 // ADD CHUNK TO THE PERSISTENT STORAGE
                 MinecraftServer server = world.getServer();
                 assert server != null;
-                ChunkStorage serverStorage = ChunkStorage.getServerState(server);
                 serverStorage.savedChunks.put(chunkID, blocks);
 
-                user.sendMessage(Text.literal("Ri captured the blocks with success!\n\n!!ATTENTION RI, SI TU LANCE LA POTION, ÇA VA PASTE LE CHUNK AU COMPLET, FAIT NOUS LA PO!!"), false);
+                user.sendMessage(Text.literal("Blocks have been captured with success!"), false);
             }
 
             firstTimeUse = true;
