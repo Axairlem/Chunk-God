@@ -139,7 +139,6 @@ public abstract class ItemMixin {
     @Inject(method = "onItemEntityDestroyed", at = @At("HEAD"))
     public void onDelete(ItemEntity entity, CallbackInfo ci) {
         ItemStack itemStack = entity.getStack();
-        entity.getOwner().sendMessage(Text.literal("Item detected"));
         if(itemStack.getItem() == Items.SPLASH_POTION){
 
             // DELETE CHUNK & BLOCK DATA FROM HASHMAPS
