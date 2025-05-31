@@ -3,10 +3,9 @@
 	"package": "net.axairlem.cg.mixin",
 	"compatibilityLevel": "JAVA_21",
 	"mixins": [
-		"GoldenShovelItemMixin",
-      	"SplashPotionItemMixin",
-		"ServerChunkLoadingManagerMixin",
-		"RegionBasedStorageMixin"
+		"ItemMixin",
+      	"PotionEntityMixin",
+		"ServerChunkLoadingManagerMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
