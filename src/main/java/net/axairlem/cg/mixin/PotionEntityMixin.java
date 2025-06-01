@@ -101,12 +101,8 @@ public class PotionEntityMixin {
                         long chunkPosLong = chunkPos.toLong();
 
                         try {
-                            NbtScannable ioWorkerNbt = serverWorld.getChunkManager().getChunkIoWorker();
-
                             // REMOVE CHUNK HOLDER AND CLEAR TICKETS
-                            Field chunkHolderMapField = ServerChunkLoadingManager.class.getDeclaredField("currentChunkHolders");
-                            chunkHolderMapField.setAccessible(true);
-                            Long2ObjectLinkedOpenHashMap<ChunkHolder> holders = (Long2ObjectLinkedOpenHashMap<ChunkHolder>) chunkHolderMapField.get(loadingManager);
+                            Long2ObjectLinkedOpenHashMap<ChunkHolder> holders = ((ServerChunkLoadingManagerMixin)loadingManager).getCurrentChunkHolders();
                             ChunkHolder holder = holders.get(chunkPosLong);
                             if (holder != null) {
                                 owner.sendMessage(Text.literal("Chunk holder @{" + chunkPos.x + ", " + chunkPos.z + "} is not NULL, clearing before deletion...").withColor(0xFFAA00));
@@ -118,17 +114,13 @@ public class PotionEntityMixin {
                                 loadingManager.getTicketManager().removeTicket(ChunkTicketType.START, chunkPos, 1, Unit.INSTANCE);
                             }
 
-                            Field storageField = ioWorkerNbt.getClass().getDeclaredField("storage");
-                            storageField.setAccessible(true);
-                            Object regionBasedStorage = storageField.get(ioWorkerNbt);
-                            Field storageKeyField = regionBasedStorage.getClass().getDeclaredField("storageKey");
-                            storageKeyField.setAccessible(true);
-                            StorageKey storageKey = (StorageKey) storageKeyField.get(regionBasedStorage);
+                            // GET STORAGE KEY
+                            StorageIoWorker storageIoWorker = (StorageIoWorker)serverWorld.getChunkManager().getChunkIoWorker();
+                            StorageKey storageKey = storageIoWorker.getStorageKey();
 
                             // CLEAR REGION CACHE
-                            Field cachedRegionFilesField = regionBasedStorage.getClass().getDeclaredField("cachedRegionFiles");
-                            cachedRegionFilesField.setAccessible(true);
-                            Long2ObjectLinkedOpenHashMap<RegionFile> regionsCache = (Long2ObjectLinkedOpenHashMap<RegionFile>) cachedRegionFilesField.get(regionBasedStorage);
+                            RegionBasedStorage regionBasedStorage = ((StorageIoWorkerMixin)storageIoWorker).getStorage();
+                            Long2ObjectLinkedOpenHashMap<RegionFile> regionsCache = ((RegionBasedStorageMixin)(Object)regionBasedStorage).getCachedRegionFiles();
                             regionsCache.clear();
 
                             // DELETE CHUNK DATA FROM .mca FILE

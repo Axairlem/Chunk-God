@@ -15,8 +15,8 @@ import java.util.Vector;
 
 public class ChunkStorage extends PersistentState {
 
-    public static HashMap<String, Vector<NbtCompound>> savedBlocks = new HashMap<String, Vector<NbtCompound>>();
-    public static HashMap<String, Vector<ChunkPos>> chunksToRegen = new HashMap<String, Vector<ChunkPos>>();
+    public HashMap<String, Vector<NbtCompound>> savedBlocks = new HashMap<String, Vector<NbtCompound>>();
+    public HashMap<String, Vector<ChunkPos>> chunksToRegen = new HashMap<String, Vector<ChunkPos>>();
 
     @Override
     public NbtCompound writeNbt(NbtCompound nbt, RegistryWrapper.WrapperLookup registryLookup) {

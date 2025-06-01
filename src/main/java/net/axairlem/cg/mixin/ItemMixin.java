@@ -139,20 +139,18 @@ public abstract class ItemMixin {
     @Inject(method = "onItemEntityDestroyed", at = @At("HEAD"))
     public void onDelete(ItemEntity entity, CallbackInfo ci) {
         ItemStack itemStack = entity.getStack();
-        entity.getOwner().sendMessage(Text.literal("Item detected"));
         if(itemStack.getItem() == Items.SPLASH_POTION){
-
             // DELETE CHUNK & BLOCK DATA FROM HASHMAPS
             MinecraftServer server = entity.getServer();
             ChunkStorage serverStorage = ChunkStorage.getServerState(server);
 
             String itemID = itemStack.get(DataComponentTypes.ITEM_NAME).getString();
             if(serverStorage.savedBlocks.containsKey(itemID)){
-                entity.getOwner().sendMessage(Text.literal("Removed " + itemID + " from saved blocks"));
+                entity.getOwner().sendMessage(Text.literal("Successfully removed " + itemID + " from saved blocks").withColor(0x55FF55));
                 serverStorage.savedBlocks.remove(itemID);
             }
             if(serverStorage.chunksToRegen.containsKey(itemID)){
-                entity.getOwner().sendMessage(Text.literal("Removed " + itemID + " from saved chunks"));
+                entity.getOwner().sendMessage(Text.literal("Successfully removed " + itemID + " from saved chunks").withColor(0x55FF55));
                 serverStorage.chunksToRegen.remove(itemID);
             }
         }
