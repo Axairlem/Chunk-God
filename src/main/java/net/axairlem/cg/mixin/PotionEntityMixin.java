@@ -8,17 +8,27 @@ import net.minecraft.block.BlockState;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityType;
+import net.minecraft.entity.Leashable;
+import net.minecraft.entity.decoration.LeashKnotEntity;
 import net.minecraft.entity.projectile.thrown.PotionEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.NbtElement;
+import net.minecraft.nbt.NbtList;
 import net.minecraft.nbt.NbtOps;
+import net.minecraft.network.packet.s2c.play.PositionFlag;
 import net.minecraft.registry.Registries;
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.registry.RegistryKeys;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.world.*;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.Unit;
+import net.minecraft.util.WorldSavePath;
+import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
@@ -30,7 +40,6 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Vector;
@@ -42,7 +51,6 @@ public class PotionEntityMixin {
     private void onCollide(HitResult hit, CallbackInfo ci) throws IOException {
 
         PotionEntity self = (PotionEntity)(Object)this;
-        Entity owner = self.getOwner();
 
         World world = self.getWorld();
         if(world.isClient) return;
@@ -50,12 +58,7 @@ public class PotionEntityMixin {
         ItemStack itemStack = self.getStack();
 
         if(itemStack.getItem() == Items.SPLASH_POTION) {
-
-            BlockPos hitPos = new BlockPos(
-                    (int)hit.getPos().x - 1, // offset to center the pasting op around the center of the potion's hit pos
-                    (int)hit.getPos().y,
-                    (int)hit.getPos().z - 1
-            );
+            BlockPos hitPos = ((BlockHitResult)hit).getBlockPos();
 
             // CHECK FOR EXISTING BLOCK DATA IN PERSISTENT STORAGE
             Text itemNameText = itemStack.get(DataComponentTypes.ITEM_NAME);
@@ -63,7 +66,10 @@ public class PotionEntityMixin {
                 String itemID = itemNameText.getString();
 
                 MinecraftServer server = world.getServer();
-                assert server != null;
+                if(server == null){
+                    System.out.println("server @PotionEntityMixin.java [68] was null...");
+                    return;
+                }
                 ChunkStorage serverStorage = ChunkStorage.getServerState(server);
                 if(serverStorage.savedBlocks.containsKey(itemID) ) {
 
@@ -75,27 +81,91 @@ public class PotionEntityMixin {
                                 entry.getInt("posY"),
                                 hitPos.getZ() + entry.getInt("posZ")
                         );
-                        Identifier blockID = Identifier.of(entry.getString("blockID"));
-                        Block block = Registries.BLOCK.get(blockID);
-                        BlockState state = block.getDefaultState();
 
                         // PARSE BLOCKSTATE
                         DataResult<BlockState> decoded = BlockState.CODEC.parse(NbtOps.INSTANCE, entry.get("blockState"));
                         decoded.result().ifPresent(loadedState -> {
-                            world.setBlockState(pos, loadedState, 2);
+                            world.setBlockState(pos, loadedState, 3);
                         });
 
                         // RESTORE BLOCK ENTITY
                         if(entry.contains("blockEntity")){
                             BlockEntity blockEntity = world.getBlockEntity(pos);
+                            if(blockEntity == null){
+                                System.out.println("blockEntity " + world.getBlockState(pos).toString() + " @PotionEntityMixin.java [93] was null...");
+                                continue;
+                            }
                             blockEntity.read(entry.getCompound("blockEntity"), world.getRegistryManager());
                         }
                     }
 
 
+                    // PASTE ENTITIES
+                    for(NbtCompound entityNbt : serverStorage.savedEntities.get(itemID)) {
+                        try{
+                            entityNbt.getUuid("UUID");
+                        } catch (NullPointerException e) {
+                            System.out.println("UUID not found" + e.getMessage());
+                            continue;
+                        }
+
+                        NbtList localPos = entityNbt.getList("Pos", NbtElement.DOUBLE_TYPE);
+                        double posX = localPos.getDouble(0) + hitPos.getX();
+                        double posY = localPos.getDouble(1);
+                        double posZ = localPos.getDouble(2) + hitPos.getZ();
+
+                        Entity entity = ((ServerWorld)world).getEntity(entityNbt.getUuid("UUID"));
+                        if(entity == null){ // RESPAWN NEW ENTITY
+                            entity = EntityType.loadEntityWithPassengers(entityNbt, world, (e) -> {
+                                e.refreshPositionAndAngles(posX, posY, posZ, e.getYaw(), e.getPitch());
+                                return e;
+                            });
+                            if(entity == null) {
+                                System.out.println("Entity (" + entityNbt.getUuid("UUID") + ") not found...");
+                            } else {
+                                world.spawnEntity(entity);
+
+                                if(entityNbt.contains("LeashLocalPos")){ // ATTACH NEW LEASH
+                                    NbtList leashPos = entityNbt.getList("LeashLocalPos", NbtElement.INT_TYPE);
+                                    BlockPos leashBlockPos = new BlockPos(
+                                            leashPos.getInt(0) + hitPos.getX(),
+                                            leashPos.getInt(1),
+                                            leashPos.getInt(2) + hitPos.getZ()
+                                    );
+                                    LeashKnotEntity leashKnotEntity = LeashKnotEntity.getOrCreate(world, leashBlockPos);
+                                    ((Leashable)entity).detachLeash(true, false);
+                                    ((Leashable)entity).attachLeash(leashKnotEntity, true);
+                                }
+                            }
+                        } else { // TELEPORT ALREADY EXISTING ENTITY
+                            entity.teleport((ServerWorld)world, posX, posY, posZ, PositionFlag.getFlags(0), entity.getYaw(), entity.getPitch());
+
+                            if(entityNbt.contains("LeashLocalPos")){ // ATTACH NEW LEASH
+                                NbtList leashPos = entityNbt.getList("LeashLocalPos", NbtElement.INT_TYPE);
+                                BlockPos leashBlockPos = new BlockPos(
+                                        leashPos.getInt(0) + hitPos.getX(),
+                                        leashPos.getInt(1),
+                                        leashPos.getInt(2) + hitPos.getZ()
+                                );
+                                LeashKnotEntity leashKnotEntity = LeashKnotEntity.getOrCreate(world, leashBlockPos);
+                                ((Leashable)entity).detachLeash(true, false);
+                                ((Leashable)entity).attachLeash(leashKnotEntity, true);
+                            }
+
+                            // FORCE REFRESH TO CLIENT
+                            ((ServerWorld)world).getChunkManager().unloadEntity(entity);
+                            ((ServerWorld)world).getChunkManager().loadEntity(entity);
+                        }
+                    }
+
+
                     // REGENERATE OLD CHUNK(S)
-                    ServerWorld serverWorld = server.getWorld(World.OVERWORLD);
-                    assert serverWorld != null;
+                    Identifier dimensionID = Identifier.of(itemID.substring(itemID.indexOf('[') + 1, itemID.indexOf(']')));
+                    ServerWorld serverWorld = server.getWorld(RegistryKey.of(RegistryKeys.WORLD, dimensionID));
+                    if(serverWorld == null){
+                        System.out.println("serverWorld @PotionEntityMixin.java [164] was null...");
+                        return;
+                    }
                     ServerChunkLoadingManager loadingManager = serverWorld.getChunkManager().chunkLoadingManager;
                     for(ChunkPos chunkPos : serverStorage.chunksToRegen.get(itemID)) {
                         long chunkPosLong = chunkPos.toLong();
@@ -105,8 +175,6 @@ public class PotionEntityMixin {
                             Long2ObjectLinkedOpenHashMap<ChunkHolder> holders = ((ServerChunkLoadingManagerMixin)loadingManager).getCurrentChunkHolders();
                             ChunkHolder holder = holders.get(chunkPosLong);
                             if (holder != null) {
-                                owner.sendMessage(Text.literal("Chunk holder @{" + chunkPos.x + ", " + chunkPos.z + "} is not NULL, clearing before deletion...").withColor(0xFFAA00));
-
                                 holders.remove(chunkPosLong);
                                 loadingManager.getTicketManager().removeTicket(ChunkTicketType.FORCED, chunkPos, 1, chunkPos);
                                 loadingManager.getTicketManager().removeTicket(ChunkTicketType.PLAYER, chunkPos, 1, chunkPos);
@@ -115,7 +183,7 @@ public class PotionEntityMixin {
                             }
 
                             // GET STORAGE KEY
-                            StorageIoWorker storageIoWorker = (StorageIoWorker)serverWorld.getChunkManager().getChunkIoWorker();
+                            StorageIoWorker storageIoWorker = (StorageIoWorker) serverWorld.getChunkManager().getChunkIoWorker();
                             StorageKey storageKey = storageIoWorker.getStorageKey();
 
                             // CLEAR REGION CACHE
@@ -124,27 +192,31 @@ public class PotionEntityMixin {
                             regionsCache.clear();
 
                             // DELETE CHUNK DATA FROM .mca FILE
+                            Path worldRootPath = serverWorld.getServer().getSavePath(WorldSavePath.ROOT).toAbsolutePath().normalize();
+                            Path folderPath = Paths.get(worldRootPath.toString(), "region");
                             String saveDir = loadingManager.getSaveDir();
-                            Path folderPath = Paths.get(saveDir, "region");
+                            if(serverWorld.getRegistryKey() == World.NETHER) {
+                                folderPath = Paths.get(worldRootPath.toString(), saveDir + "/region");
+                            } else if(serverWorld.getRegistryKey() == World.END) {
+                                folderPath = Paths.get(worldRootPath.toString(), saveDir + "/region");
+                            }
                             Path regionPath = folderPath.resolve(String.format("r.%d.%d.mca", chunkPos.x >> 5, chunkPos.z >> 5));
-                            RegionFile region = new RegionFile(storageKey, regionPath, folderPath, true);
-                            if (region.hasChunk(chunkPos)) {
-                                region.delete(chunkPos);
-                                owner.sendMessage(Text.literal("Chunk {" + chunkPos.x + ", " + chunkPos.z + "} has been successfully deleted from file: " + regionPath).withColor(0x55FF55));
+                            RegionFile regionFile = new RegionFile(storageKey, regionPath, folderPath, true);
+                            if (regionFile.hasChunk(chunkPos)) {
+                                regionFile.delete(chunkPos);
                             } else {
-                                owner.sendMessage(Text.literal("No saved chunk data was found in file: " + regionPath).withColor(0xFFAA00));
+                                System.out.println("No saved chunk data was found in file: " + regionPath);
                             }
 
                         } catch (Exception e) {
-                            owner.sendMessage(Text.literal("Exception occurred :  " + e.getMessage()).withColor(0xFF5555));
+                            System.out.println("Exception occurred @PotionEntityMixin.java [173 to 206]:  " + e.getMessage());
                         }
                     };
 
                     // CLEAR MEMORY FROM HASHMAPS
                     serverStorage.savedBlocks.remove(itemID);
                     serverStorage.chunksToRegen.remove(itemID);
-
-                    owner.sendMessage(Text.literal("Blocks have been pasted successfully!").withColor(0xFF55FF));
+                    serverStorage.savedEntities.remove(itemID);
                 }
             }
         }

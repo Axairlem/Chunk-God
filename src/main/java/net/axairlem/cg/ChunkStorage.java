@@ -10,6 +10,7 @@ import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.PersistentState;
 import net.minecraft.world.World;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Vector;
 
@@ -17,6 +18,7 @@ public class ChunkStorage extends PersistentState {
 
     public HashMap<String, Vector<NbtCompound>> savedBlocks = new HashMap<String, Vector<NbtCompound>>();
     public HashMap<String, Vector<ChunkPos>> chunksToRegen = new HashMap<String, Vector<ChunkPos>>();
+    public HashMap<String, ArrayList<NbtCompound>> savedEntities = new HashMap<String, ArrayList<NbtCompound>>();
 
     @Override
     public NbtCompound writeNbt(NbtCompound nbt, RegistryWrapper.WrapperLookup registryLookup) {
@@ -54,6 +56,20 @@ public class ChunkStorage extends PersistentState {
         }
         nbt.put("chunksToRegen", chunkList);
 
+        // PUT "savedEntities" IN PERSISTENT STORAGE
+        NbtList entitiesList = new NbtList();
+        for(var entry : savedEntities.entrySet()) {
+            NbtCompound entityData = new NbtCompound();
+            entityData.putString("itemID", entry.getKey());
+
+            NbtList entities = new NbtList();
+            entities.addAll(entry.getValue());
+            entityData.put("entities", entities);
+
+            entitiesList.add(entityData);
+        }
+        nbt.put("savedEntities", entitiesList);
+
         return nbt;
     }
     public static ChunkStorage createFromNbt(NbtCompound tag, RegistryWrapper.WrapperLookup registryLookup) {
@@ -78,7 +94,7 @@ public class ChunkStorage extends PersistentState {
         for(NbtElement entry : chunkList) {
             String itemID = ((NbtCompound)entry).getString("itemID");
 
-            NbtList chunks = ((NbtCompound) entry).getList("chunks", NbtElement.COMPOUND_TYPE);
+            NbtList chunks = ((NbtCompound)entry).getList("chunks", NbtElement.COMPOUND_TYPE);
             Vector<ChunkPos> chunksToRegen = new Vector<ChunkPos>();
             for(var chunkCompound : chunks){
                 chunksToRegen.add( new ChunkPos(((NbtCompound)chunkCompound).getInt("chunkPosX"), ((NbtCompound)chunkCompound).getInt("chunkPosZ")) );
@@ -87,12 +103,27 @@ public class ChunkStorage extends PersistentState {
             storage.chunksToRegen.put(itemID, chunksToRegen);
         }
 
+        // ADD "savedEntities" FROM PERSISTENT STORAGE
+        NbtList entitiesList = tag.getList("savedEntities", NbtElement.COMPOUND_TYPE);
+        for(NbtElement entry : entitiesList) {
+            String itemID = ((NbtCompound)entry).getString("itemID");
+
+            NbtList entities = ((NbtCompound)entry).getList("entities", NbtElement.COMPOUND_TYPE);
+            ArrayList<NbtCompound> savedEntities = new ArrayList<>();
+            for(NbtElement entity : entities) {
+                savedEntities.add((NbtCompound)entity);
+            }
+
+            storage.savedEntities.put(itemID, savedEntities);
+        }
+
         return storage;
     }
     public static ChunkStorage createNew(){
         ChunkStorage storage = new ChunkStorage();
         storage.savedBlocks = new HashMap<>();
         storage.chunksToRegen = new HashMap<>();
+        storage.savedEntities = new HashMap<>();
         return storage;
     }
     private static final Type<ChunkStorage> type = new Type<>(
